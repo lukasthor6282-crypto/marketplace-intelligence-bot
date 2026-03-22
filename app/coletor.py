@@ -6,12 +6,13 @@ HEADERS = {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/122.0.0.0 Safari/537.36"
-    )
+    ),
+    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
 }
 
 
 def baixar_pagina(url):
-    resposta = requests.get(url, headers=HEADERS, timeout=15)
+    resposta = requests.get(url, headers=HEADERS, timeout=20)
     resposta.raise_for_status()
     return resposta.text
 
@@ -38,7 +39,6 @@ def coletar_produtos(html):
     soup = BeautifulSoup(html, "html.parser")
     produtos = []
 
-    # tenta encontrar os cards principais
     cards = soup.select(".ui-search-layout__item")
 
     if not cards:
@@ -48,6 +48,7 @@ def coletar_produtos(html):
         cards = soup.select("li.ui-search-layout__item")
 
     print("Quantidade de cards encontrados:", len(cards))
+    print("Título da página:", soup.title.get_text(strip=True) if soup.title else "Sem título")
 
     for card in cards:
         titulo = (
