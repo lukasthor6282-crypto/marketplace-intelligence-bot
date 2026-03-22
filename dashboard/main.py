@@ -7,7 +7,6 @@ sys.path.append(str(ROOT))
 import streamlit as st
 import pandas as pd
 
-from app.utils import formatar_busca
 from app.coletor import baixar_pagina, coletar_produtos
 from app.analise import (
     limpar_dados,
@@ -53,9 +52,6 @@ st.markdown("""
 
 
 def executar_analise(produto):
-    busca_formatada = formatar_busca(produto)
-    produtoS = f"https://lista.mercadolivre.com.br/{busca_formatada}"
-
     html = baixar_pagina(produto)
     produtos = coletar_produtos(html)
 
