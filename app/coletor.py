@@ -35,15 +35,8 @@ def baixar_pagina(produto: str) -> str:
 
     time.sleep(random.uniform(1.0, 2.2))
 
-    resposta = SESSION.get(
-        url,
-        timeout=25,
-        allow_redirects=True
-    )
-
+    resposta = SESSION.get(url, timeout=25, allow_redirects=True)
     resposta.raise_for_status()
-
-    time.sleep(random.uniform(0.5, 1.5))
 
     return resposta.text
 
@@ -69,38 +62,33 @@ def converter_preco(texto_preco):
 def pagina_parece_bloqueada(html: str) -> bool:
     html_lower = html.lower()
 
-    sinais = [
+    sinais_fortes = [
         "captcha",
         "access denied",
         "are you a human",
-        "verifique que você é humano",
-        "temporarily unavailable",
-        "forbidden",
-        "robot",
         "security check",
+        "/captcha/",
     ]
 
-    return any(sinal in html_lower for sinal in sinais)
+    return any(sinal in html_lower for sinal in sinais_fortes)
 
 
 def coletar_produtos(html):
-    if pagina_parece_bloqueada(html):
-        raise ValueError("O site retornou uma página de bloqueio/validação.")
-
-    if "mercado livre" not in html.lower():
-        raise ValueError("Página não parece ser do Mercado Livre (possível bloqueio).")
-
     soup = BeautifulSoup(html, "html.parser")
     produtos = []
+
+    # Só bloqueia se os sinais forem muito claros
+    if pagina_parece_bloqueada(html):
+        titulo = soup.title.get_text(strip=True) if soup.title else "Sem título"
+        raise ValueError(f"O site retornou possível bloqueio. Título da página: {titulo}")
 
     seletores_cards = [
         ".ui-search-layout__item",
         ".ui-search-result",
         ".poly-card",
-        ".poly-card__content",
         "li.ui-search-layout__item",
         "ol.ui-search-layout li",
-        "div[data-testid='product-card']"
+        "div[data-testid='product-card']",
     ]
 
     cards = []
@@ -109,15 +97,9 @@ def coletar_produtos(html):
         if cards:
             break
 
+    # Fallback mais amplo
     if not cards:
-        titulo = soup.title.get_text(strip=True) if soup.title else "Sem título"
-        trecho = soup.get_text(separator=" ", strip=True)[:500]
-
-        raise ValueError(
-            f"Nenhum card encontrado. "
-            f"Título da página: {titulo}. "
-            f"Conteúdo inicial: {trecho}"
-        )
+        cards = soup.find_all(["li", "div"], limit=300)
 
     for card in cards:
         titulo = (
@@ -139,7 +121,6 @@ def coletar_produtos(html):
             card.select_one("a.ui-search-link") or
             card.select_one("a")
         )
-
         link = link_elemento.get("href") if link_elemento else ""
 
         vendedor = (
@@ -156,4 +137,21 @@ def coletar_produtos(html):
                 "link": link
             })
 
-    return produtos
+    # remove duplicados
+    produtos_unicos = []
+    vistos = set()
+
+    for produto in produtos:
+        chave = (produto["titulo"], produto["preco"])
+        if chave not in vistos:
+            vistos.add(chave)
+            produtos_unicos.append(produto)
+
+    if not produtos_unicos:
+        titulo = soup.title.get_text(strip=True) if soup.title else "Sem título"
+        trecho = soup.get_text(separator=" ", strip=True)[:500]
+        raise ValueError(
+            f"Nenhum produto encontrado. Título da página: {titulo}. Conteúdo inicial: {trecho}"
+        )
+
+    return produtos_unicos
