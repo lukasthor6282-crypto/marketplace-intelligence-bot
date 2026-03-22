@@ -30,7 +30,6 @@ def baixar_pagina(produto: str) -> str:
     busca = formatar_busca_url(produto)
     url = f"https://lista.mercadolivre.com.br/{busca}"
 
-    # atraso pequeno para parecer menos robótico
     time.sleep(random.uniform(1.0, 2.2))
 
     resposta = SESSION.get(url, timeout=25, allow_redirects=True)
@@ -90,7 +89,6 @@ def coletar_produtos(html):
             break
 
     if not cards:
-        # diagnóstico útil
         titulo = soup.title.get_text(strip=True) if soup.title else "Sem título"
         raise ValueError(f"Nenhum card encontrado. Título da página: {titulo}")
 
