@@ -54,9 +54,9 @@ st.markdown("""
 
 def executar_analise(produto):
     busca_formatada = formatar_busca(produto)
-    url = f"https://lista.mercadolivre.com.br/{busca_formatada}"
+    produtoS = f"https://lista.mercadolivre.com.br/{busca_formatada}"
 
-    html = baixar_pagina(url)
+    html = baixar_pagina(produto)
     produtos = coletar_produtos(html)
 
     if not produtos:
@@ -356,4 +356,5 @@ if resultado:
             )
             st.success("Relatório Excel gerado com sucesso em data/relatorio_marketplace.xlsx")
         except Exception as erro:
-            st.error(f"Erro ao gerar Excel: {erro}")
+         st.error(f"Erro ao analisar produto: {erro}")
+         st.caption("Se isso acontecer só no app online, provavelmente o site mudou a resposta ou aplicou bloqueio leve.")

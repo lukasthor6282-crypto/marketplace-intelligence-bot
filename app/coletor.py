@@ -1,5 +1,8 @@
+import time
+import random
 import requests
 from bs4 import BeautifulSoup
+from urllib.parse import quote_plus
 
 HEADERS = {
     "User-Agent": (
@@ -7,12 +10,30 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/122.0.0.0 Safari/537.36"
     ),
-    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
+    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
 }
 
+SESSION = requests.Session()
+SESSION.headers.update(HEADERS)
 
-def baixar_pagina(url):
-    resposta = requests.get(url, headers=HEADERS, timeout=20)
+
+def formatar_busca_url(produto: str) -> str:
+    return quote_plus(produto.strip())
+
+
+def baixar_pagina(produto: str) -> str:
+    busca = formatar_busca_url(produto)
+    url = f"https://lista.mercadolivre.com.br/{busca}"
+
+    # atraso pequeno para parecer menos robótico
+    time.sleep(random.uniform(1.0, 2.2))
+
+    resposta = SESSION.get(url, timeout=25, allow_redirects=True)
     resposta.raise_for_status()
     return resposta.text
 
@@ -35,20 +56,43 @@ def converter_preco(texto_preco):
         return None
 
 
+def pagina_parece_bloqueada(html: str) -> bool:
+    html_lower = html.lower()
+    sinais = [
+        "captcha",
+        "access denied",
+        "are you a human",
+        "verifique que você é humano",
+        "página não encontrada",
+        "temporarily unavailable",
+    ]
+    return any(sinal in html_lower for sinal in sinais)
+
+
 def coletar_produtos(html):
+    if pagina_parece_bloqueada(html):
+        raise ValueError("O site retornou uma página de bloqueio/validação.")
+
     soup = BeautifulSoup(html, "html.parser")
     produtos = []
 
-    cards = soup.select(".ui-search-layout__item")
+    seletores_cards = [
+        ".ui-search-layout__item",
+        ".ui-search-result",
+        "li.ui-search-layout__item",
+        "ol.ui-search-layout li",
+    ]
+
+    cards = []
+    for seletor in seletores_cards:
+        cards = soup.select(seletor)
+        if cards:
+            break
 
     if not cards:
-        cards = soup.select(".ui-search-result")
-
-    if not cards:
-        cards = soup.select("li.ui-search-layout__item")
-
-    print("Quantidade de cards encontrados:", len(cards))
-    print("Título da página:", soup.title.get_text(strip=True) if soup.title else "Sem título")
+        # diagnóstico útil
+        titulo = soup.title.get_text(strip=True) if soup.title else "Sem título"
+        raise ValueError(f"Nenhum card encontrado. Título da página: {titulo}")
 
     for card in cards:
         titulo = (
@@ -70,7 +114,6 @@ def coletar_produtos(html):
             card.select_one("a.ui-search-link") or
             card.select_one("a")
         )
-
         link = link_elemento.get("href") if link_elemento else ""
 
         vendedor = (
