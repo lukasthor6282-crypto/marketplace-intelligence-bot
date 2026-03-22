@@ -11,7 +11,10 @@ HEADERS = {
         "Chrome/122.0.0.0 Safari/537.36"
     ),
     "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "image/avif,image/webp,*/*;q=0.8"
+    ),
     "Connection": "keep-alive",
     "Upgrade-Insecure-Requests": "1",
     "Cache-Control": "no-cache",
@@ -32,8 +35,16 @@ def baixar_pagina(produto: str) -> str:
 
     time.sleep(random.uniform(1.0, 2.2))
 
-    resposta = SESSION.get(url, timeout=25, allow_redirects=True)
+    resposta = SESSION.get(
+        url,
+        timeout=25,
+        allow_redirects=True
+    )
+
     resposta.raise_for_status()
+
+    time.sleep(random.uniform(0.5, 1.5))
+
     return resposta.text
 
 
@@ -57,14 +68,18 @@ def converter_preco(texto_preco):
 
 def pagina_parece_bloqueada(html: str) -> bool:
     html_lower = html.lower()
+
     sinais = [
         "captcha",
         "access denied",
         "are you a human",
         "verifique que você é humano",
-        "página não encontrada",
         "temporarily unavailable",
+        "forbidden",
+        "robot",
+        "security check",
     ]
+
     return any(sinal in html_lower for sinal in sinais)
 
 
@@ -72,14 +87,20 @@ def coletar_produtos(html):
     if pagina_parece_bloqueada(html):
         raise ValueError("O site retornou uma página de bloqueio/validação.")
 
+    if "mercado livre" not in html.lower():
+        raise ValueError("Página não parece ser do Mercado Livre (possível bloqueio).")
+
     soup = BeautifulSoup(html, "html.parser")
     produtos = []
 
     seletores_cards = [
         ".ui-search-layout__item",
         ".ui-search-result",
+        ".poly-card",
+        ".poly-card__content",
         "li.ui-search-layout__item",
         "ol.ui-search-layout li",
+        "div[data-testid='product-card']"
     ]
 
     cards = []
@@ -90,7 +111,13 @@ def coletar_produtos(html):
 
     if not cards:
         titulo = soup.title.get_text(strip=True) if soup.title else "Sem título"
-        raise ValueError(f"Nenhum card encontrado. Título da página: {titulo}")
+        trecho = soup.get_text(separator=" ", strip=True)[:500]
+
+        raise ValueError(
+            f"Nenhum card encontrado. "
+            f"Título da página: {titulo}. "
+            f"Conteúdo inicial: {trecho}"
+        )
 
     for card in cards:
         titulo = (
@@ -112,6 +139,7 @@ def coletar_produtos(html):
             card.select_one("a.ui-search-link") or
             card.select_one("a")
         )
+
         link = link_elemento.get("href") if link_elemento else ""
 
         vendedor = (
